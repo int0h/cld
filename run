@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+CONTAINER_HOME='/root'
+HOST_HOME=$HOME/.cld
+
+mkdir -p $HOST_HOME
+[ ! -s $HOST_HOME/.claude.json ] && echo '{}' > $HOST_HOME/.claude.json
+
+mkdir -p $HOST_HOME/hidden_stub
+echo 'ACCESS_DENIED' > $HOST_HOME/hidden_stub/access_denied
+
+mount_if_exists() {
+  local base="$1"
+  local name="$2"
+  local dst_base="$3"
+  local mode="${4:-ro}"
+
+  find "$base" -type d -name "$name" -prune 2>/dev/null | while read -r src; do
+    rel="${src#$base/}"
+    echo "-v $src:$dst_base/$rel:$mode"
+  done
+}
+
+hidden_mounts() {
+  local config_file="${1:-.cld/hidden}"
+  local dummy_src="${2:-$HOST_HOME/hidden_stub}"
+
+  [ -f "$config_file" ] || return 0
+
+  while IFS= read -r path || [ -n "$path" ]; do
+    # trim whitespace
+    path="$(echo "$path" | xargs)"
+
+    # skip empty lines and comments
+    [ -z "$path" ] && continue
+    case "$path" in \#*) continue ;; esac
+
+    echo "-v $dummy_src:/ws/$path:ro"
+  done < "$config_file"
+}
+
+GIT_MOUNT=$(mount_if_exists "$(pwd)" ".git" "/ws" | xargs)
+NODE_MODULES_MOUNT=$(mount_if_exists "$(pwd)" "node_modules" "/ws" | xargs)
+
+HIDDEN_MOUNTS=$(hidden_mounts)
+
+docker run \
+  --pull=never \
+  -v $(pwd):/ws \
+  $GIT_MOUNT \
+  $NODE_MODULES_MOUNT \
+  $HIDDEN_MOUNTS \
+  -v $HOST_HOME/.claude:$CONTAINER_HOME/.claude \
+  -v $HOST_HOME/.claude.json:$CONTAINER_HOME/.claude.json \
+  --device /dev/snd:/dev/snd \
+  -it \
+  cld
