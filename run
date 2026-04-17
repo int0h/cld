@@ -54,4 +54,4 @@ docker run \
   -v $HOST_HOME/.claude.json:$CONTAINER_HOME/.claude.json \
   --device /dev/snd:/dev/snd \
   -it \
-  cld
+  cld "$@"
