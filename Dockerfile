@@ -32,17 +32,17 @@ ENV NODE_VERSION=24
 
 RUN mkdir -p $NVM_DIR
 
-# Install nvm with node and npm
+# Install nvm + node, then symlink binaries to a stable path so PATH resolution
+# works regardless of the full semver NVM resolves (e.g. v24 → v24.16.0)
 RUN curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
     && . $NVM_DIR/nvm.sh \
     && nvm install $NODE_VERSION \
     && nvm alias default $NODE_VERSION \
-    && nvm use default
-
-ENV NODE_PATH=$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules
-ENV      PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
-
-RUN . "$NVM_DIR/nvm.sh"
+    && nvm use default \
+    && NODE_BIN=$(dirname $(nvm which default)) \
+    && ln -sf $NODE_BIN/node /usr/local/bin/node \
+    && ln -sf $NODE_BIN/npm  /usr/local/bin/npm \
+    && ln -sf $NODE_BIN/npx  /usr/local/bin/npx
 
 # ====-====-====-====-====-====-====-====-====-====-====
 
